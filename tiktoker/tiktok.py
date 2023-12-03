@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, ValidationError
 from structlog.stdlib import BoundLogger, get_logger
 from tenacity import retry, retry_if_exception_type, wait_exponential, wait_random
 
@@ -14,7 +15,7 @@ logger = get_logger()
 class FetchResult:
     cursor: int
     duration_sec: float
-    content: Any
+    posts: list[dict[str, Any]]
     response_headers: httpx.Headers
     request_headers: httpx.Headers
     request_url: str
@@ -23,7 +24,7 @@ class FetchResult:
 @dataclass(frozen=True, slots=True)
 class DownloadResult:
     duration_sec: float
-    content: Any
+    posts: list[dict[str, Any]]
     has_more: bool
     cursor: int
     response_headers: httpx.Headers
@@ -31,10 +32,20 @@ class DownloadResult:
     request_url: str
 
 
+class ListPage(BaseModel):
+    hasMore: bool  # noqa: N815
+    cursor: int
+    itemList: list[dict[str, Any]]  # noqa: N815
+
+
 @retry(
-    retry=retry_if_exception_type(httpx.HTTPError),
+    retry=retry_if_exception_type((httpx.HTTPError, ValidationError)),
     wait=wait_exponential(multiplier=1, min=0.5, max=15) + wait_random(0, 2),
-    after=lambda x: logger.warning("call failed", attempt=x.attempt_number),
+    after=lambda x: logger.warning(
+        "download favorites batch request failed. Retrying...",
+        attempt=x.attempt_number,
+        exec=x.outcome is not None and x.outcome.exception(),  # pyright: ignore [reportUnknownMemberType]
+    ),
 )
 def _download_favorites_batch(*, cursor: int, session_id: str) -> DownloadResult:
     headers = {
@@ -104,12 +115,12 @@ def _download_favorites_batch(*, cursor: int, session_id: str) -> DownloadResult
     end = time.monotonic()
     duration_sec = end - start
     res.raise_for_status()
-    content = res.json()
+    page = ListPage.model_validate_json(res.content)
     return DownloadResult(
         duration_sec=duration_sec,
-        content=content,
-        has_more=content["hasMore"],
-        cursor=content["cursor"],
+        posts=page.itemList,
+        has_more=page.hasMore,
+        cursor=page.cursor,
         response_headers=res.headers,
         request_headers=res.request.headers,
         request_url=str(res.request.url),
@@ -137,7 +148,7 @@ class TikTok:
             yield FetchResult(
                 cursor=created_before,
                 duration_sec=res.duration_sec,
-                content=res.content,
+                posts=res.posts,
                 response_headers=res.response_headers,
                 request_headers=res.request_headers,
                 request_url=res.request_url,

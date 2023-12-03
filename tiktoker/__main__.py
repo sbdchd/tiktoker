@@ -49,7 +49,7 @@ def export_favorites_metadata(
                 http_response_headers_json=dict(fav_batch.response_headers.items()),
                 post_json=post,
             )
-            for post in fav_batch.content["itemList"]
+            for post in fav_batch.posts
         ]
         db.posts.create(posts)
         db.export.checkpoint(export_id=exp.export_id, cursor=fav_batch.cursor)

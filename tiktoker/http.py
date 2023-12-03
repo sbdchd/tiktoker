@@ -17,7 +17,11 @@ class ImageResult:
 @retry(
     retry=retry_if_exception_type(httpx.HTTPError),
     wait=wait_exponential(multiplier=1, min=0.5, max=15) + wait_random(0, 2),
-    after=lambda x: logger.warning("call failed", attempt=x.attempt_number),
+    after=lambda x: logger.warning(
+        "download image request failed. Retrying...",
+        attempt=x.attempt_number,
+        exec=x.outcome is not None and x.outcome.exception(),  # pyright: ignore [reportUnknownMemberType]
+    ),
 )
 def download_image(*, url: str) -> ImageResult:
     res = httpx.get(url)
