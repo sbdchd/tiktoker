@@ -1,0 +1,73 @@
+[tool.poetry]
+name = "tiktoker"
+version = "0.1.0"
+description = ""
+authors = ["Steve Dignam <steve@dignam.xyz>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.25.2"
+ipython = "^8.18.1"
+structlog = "^23.2.0"
+typing-extensions = "^4.8.0"
+typer = "^0.9.0"
+tenacity = "^8.2.3"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.1.6"
+
+[tool.ruff]
+select = [
+    "E",
+    "F",
+    "TID252",
+    "I001",
+    "T20",
+    "C4",
+    "UP",
+    "N",
+    "BLE",
+    "B",
+    "RET",
+    "SIM",
+    "ARG",
+    "DTZ",
+    "ERA",
+    "RUF",
+]
+src = ["tiktoker"]
+ignore = [
+    "E501",   # line length is handled by black
+    "ARG001", # pytest fixtures mess with this
+    "ARG002", # sometimes parent classes require params
+    "B008",   # type.Argument violates this
+    "N805",   # false positive with pydantic
+    "RET505", # if, elif, else are fine with returns
+    "RET507", # if, elif, else with continue is also fine
+    "RET508", # if, elif, else with break is also fine
+]
+unfixable = [
+    "ERA001",
+] # we want to check ourselves before we delete commented out code. Also this doesn't cleanup all of it.
+target-version = "py311"
+
+[tool.ruff.isort]
+known-first-party = ["tiktoker"]
+
+[tool.ruff.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+
+[tool.pyright]
+include = ["tiktoker"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

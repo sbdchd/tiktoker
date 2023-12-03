@@ -1,0 +1,6 @@
+{
+  "python.analysis.inlayHints.functionReturnTypes": false,
+  "python.analysis.inlayHints.callArgumentNames": false,
+  "python.analysis.logLevel": "Information",
+  "python.analysis.typeCheckingMode": "strict"
+}
