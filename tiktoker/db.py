@@ -34,8 +34,42 @@ limit 1;
         export_id, cursor = result
         return Export(export_id=export_id, cursor=cursor)
 
-    def get_or_create(self) -> Export:
+    def get(self, *, export_id: int) -> Export | None:
         cur = self._conn.cursor()
+        result = cur.execute(
+            """
+select id, cursor 
+from tiktok_export 
+where id = :export_id
+limit 1;
+        """,
+            {"export_id": export_id},
+        ).fetchone()
+        if result is None:
+            return None
+        export_id, cursor = result
+        return Export(export_id=export_id, cursor=cursor)
+
+    def get_most_recent_cursor(self, *, export_id: int) -> int | None:
+        cur = self._conn.cursor()
+        result = cur.execute(
+            """
+SELECT
+  max(http_request_param_cursor)
+FROM
+  tiktok_posts
+WHERE
+  export_id = :export_id
+LIMIT 1;
+        """,
+            {"export_id": export_id},
+        ).fetchone()
+        if result is None:
+            return None
+        (cursor,) = result
+        return cursor
+
+    def get_or_create(self) -> Export:
         export = self._get_current()
         if export is not None:
             self._log.info(
@@ -45,11 +79,13 @@ limit 1;
             )
             return export
         self._log.info("no incomplete export found. creating...")
+        cursor = int(time.time())
+        cur = self._conn.cursor()
         cur.execute(
             """
 insert into tiktok_export(cursor) values (:cursor);
         """,
-            {"cursor": int(time.time())},
+            {"cursor": cursor},
         )
         self._conn.commit()
 
@@ -118,7 +154,7 @@ class PostUrl:
 
 @dataclass(frozen=True, slots=True)
 class Slideshow:
-    id: int
+    id: str
     author: str
     desc: str
     images: list[str]
@@ -152,17 +188,22 @@ insert into tiktok_posts(
         )
         self._conn.commit()
 
-    def urls(self, export_id: int) -> list[str]:
+    def urls(self, export_id: int, *, starting_after: int | None = None) -> list[str]:
         cur = self._conn.cursor()
         cur.execute(
             """
-select
+SELECT
 	post_id,
-    post_author
-from tiktok_posts
-where export_id = :export_id;
+	post_author
+FROM
+	tiktok_posts
+WHERE
+	export_id = :export_id
+	AND (:starting_after is null or http_request_param_cursor > :starting_after)
+GROUP BY
+	post_id;
         """,
-            {"export_id": export_id},
+            {"export_id": export_id, "starting_after": starting_after},
         )
         urls = list[str]()
         for post_id, author in cur.fetchall():
