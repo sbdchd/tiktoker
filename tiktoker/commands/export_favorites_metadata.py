@@ -88,7 +88,11 @@ def export_favorites_metadata_sync_latest(
                 cursor=fav_batch.cursor,
             )
             break
-        db.posts.create(posts)
+        posts_created_count = db.posts.create(posts)
+        if not posts_created_count:
+            log.info("no new posts created")
+            break
+        log.info("posts created", posts_created_count=posts_created_count)
         db.export.checkpoint(export_id=exp.export_id, cursor=fav_batch.cursor)
 
     db.export.complete(export_id=exp.export_id)

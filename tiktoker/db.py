@@ -164,11 +164,11 @@ class Slideshow:
 class PostTable:
     _conn: sqlite3.Connection
 
-    def create(self, records: Sequence[PostCreateParams]) -> None:
+    def create(self, records: Sequence[PostCreateParams]) -> int:
         cur = self._conn.cursor()
         cur.executemany(
             """
-insert into tiktok_posts(
+insert or ignore into tiktok_posts(
     http_request_duration_sec, 
     http_request_param_cursor, 
     http_request_url,
@@ -187,6 +187,7 @@ insert into tiktok_posts(
             [r.to_dict() for r in records],
         )
         self._conn.commit()
+        return cur.rowcount
 
     def urls(self, export_id: int, *, starting_after: int | None = None) -> list[str]:
         cur = self._conn.cursor()
@@ -279,6 +280,9 @@ create table if not exists tiktok_posts (
 
     foreign key(export_id) references tiktok_export(id)
 ) strict;
+
+create unique index if not exists
+    unique_videos_per_export on tiktok_posts (export_id, post_id);
         """
         )
         self._conn.commit()
