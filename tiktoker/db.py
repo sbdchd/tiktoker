@@ -245,6 +245,7 @@ class DB:
     @classmethod
     def create(cls, *, path: str, log: BoundLogger) -> "DB":
         conn = sqlite3.connect(path)
+        conn.execute("PRAGMA foreign_keys = ON")
         db = DB(conn, log)
         db._create_tables()
         return db
